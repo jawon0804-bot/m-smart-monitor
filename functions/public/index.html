@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>m-smart-90148 모니터링</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root{
+    --bg:#0B0F14;
+    --panel:#11161D;
+    --panel-2:#161D26;
+    --line:#232C36;
+    --text:#E7ECF1;
+    --sub:#8996A5;
+    --accent:#2DD4BF;
+    --accent-2:#5EA1FF;
+    --warn:#F5A623;
+    --danger:#EF4B5F;
+    --mono:'IBM Plex Mono', monospace;
+    --sans:'IBM Plex Sans', sans-serif;
+  }
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+  *{box-sizing:border-box;}
+  body{
+    margin:0; background:var(--bg); color:var(--text);
+    font-family:var(--sans);
+    -webkit-font-smoothing:antialiased;
+  }
+  .main{ max-width:1240px; margin:0 auto; padding:26px 30px 60px; }
+  .topbar{ display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:22px; }
+  .topbar h1{ font-size:20px; margin:0 0 4px; font-weight:600; }
+  .topbar .sub{ color:var(--sub); font-size:13px; }
+  .badge{
+    font-family:var(--mono); font-size:10.5px; letter-spacing:.06em;
+    padding:3px 8px; border-radius:5px; text-transform:uppercase;
+  }
+  .badge-ok{ color:var(--accent); background:#0F2A26; border:1px solid #164A40; }
+  .badge-warn{ color:var(--warn); background:#2A2211; border:1px solid #4A3B14; }
+  .badge-danger{ color:var(--danger); background:#2A1216; border:1px solid #4A1B22; }
+
+  .kpis{ display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-bottom:22px; }
+  .kpi{ background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:16px 18px; }
+  .kpi .label{ font-size:11.5px; color:var(--sub); text-transform:uppercase; letter-spacing:.05em; margin-bottom:8px; }
+  .kpi .value{ font-family:var(--mono); font-size:26px; font-weight:600; }
+
+  .section-label{
+    font-family:var(--mono); font-size:11px; letter-spacing:.08em; text-transform:uppercase;
+    color:#5B6672; margin:26px 0 10px; padding-top:6px; border-top:1px solid var(--line);
+  }
+  .grid{ display:grid; grid-template-columns:1fr 1fr; gap:16px; align-items:start; }
+  .card{ background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:0; overflow:hidden; }
+  .card.full{ grid-column:1 / -1; }
+  .card-header{
+    display:flex; align-items:center; justify-content:space-between; gap:10px;
+    padding:14px 18px; cursor:pointer; user-select:none; border-bottom:1px solid var(--line);
+  }
+  .card.collapsed .card-header{ border-bottom:none; }
+  .card-header:hover{ background:var(--panel-2); }
+  .card h3{ font-size:13.5px; margin:0; font-weight:600; display:flex; align-items:center; gap:8px; }
+  .card .desc{ font-size:11.5px; color:var(--sub); margin-bottom:10px; }
+  .card-body{ padding:14px 18px; }
+  .card.collapsed .card-body{ display:none; }
+  .collapse-btn{
+    background:none; border:none; color:var(--sub); font-size:13px; cursor:pointer;
+    padding:2px 6px; transition:transform .18s; flex-shrink:0;
+  }
+  .card.collapsed .collapse-btn{ transform:rotate(-90deg); }
+  canvas{ max-height:210px; }
+
+  .stat-row{ display:flex; gap:22px; flex-wrap:wrap; margin-bottom:10px; }
+  .stat{ }
+  .stat .n{ font-family:var(--mono); font-size:20px; font-weight:600; }
+  .stat .l{ font-size:11px; color:var(--sub); }
+
+  .err-list, .plain-list{ list-style:none; margin:0; padding:0; font-size:12.5px; }
+  .err-list li, .plain-list li{
+    display:flex; justify-content:space-between; gap:10px;
+    padding:9px 0; border-bottom:1px solid var(--line);
+  }
+  .err-list li:last-child, .plain-list li:last-child{ border-bottom:none; }
+  .err-list .msg{ color:var(--text); }
+  .err-list .meta, .plain-list .meta{ color:var(--sub); font-family:var(--mono); font-size:11px; white-space:nowrap; }
+  .sev{ display:inline-block; width:6px; height:6px; border-radius:50%; margin-right:8px; flex-shrink:0; }
+  .empty{ color:var(--sub); font-size:12px; padding:6px 0; }
+
+  @media (max-width:880px){
+    .grid{ grid-template-columns:1fr; }
+    .kpis{ grid-template-columns:1fr 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="main">
+  <div class="topbar">
+    <div>
+      <h1>m-smart-90148 통합 모니터링</h1>
+      <div class="sub" id="updatedAt">불러오는 중...</div>
+    </div>
+    <span class="badge badge-ok" id="liveBadge">LIVE DATA</span>
+  </div>
+
+  <div class="kpis" id="kpiRow"></div>
+
+  <div class="section-label">Firebase Hosting</div>
+  <div class="grid" id="hostingGrid"></div>
+
+  <div class="section-label">Cloud Run</div>
+  <div class="grid">
+    <div class="card full">
+      <div class="card-header" onclick="toggleCard(this)">
+        <h3>서비스별 요청 수 비교 (24h)</h3>
+        <button class="collapse-btn">▾</button>
+      </div>
+      <div class="card-body">
+        <canvas id="chartCloudRun"></canvas>
+      </div>
+    </div>
+  </div>
+  <div class="grid" id="cloudRunGrid"></div>
+
+  <div class="section-label">Firebase Functions</div>
+  <div class="grid">
+    <div class="card full">
+      <div class="card-header" onclick="toggleCard(this)">
+        <h3>함수별 호출/에러 비교 (24h)</h3>
+        <button class="collapse-btn">▾</button>
+      </div>
+      <div class="card-body">
+        <canvas id="chartFunctions"></canvas>
+      </div>
+    </div>
+  </div>
+  <div class="grid" id="functionsGrid"></div>
+
+  <div class="section-label">Cloud Scheduler / Cloud Tasks</div>
+  <div class="grid">
+    <div class="card full">
+      <div class="card-header" onclick="toggleCard(this)">
+        <h3>스케줄 잡 상태</h3>
+        <button class="collapse-btn">▾</button>
+      </div>
+      <div class="card-body">
+        <ul class="plain-list" id="schedulerList"></ul>
+      </div>
+    </div>
+    <div class="card full">
+      <div class="card-header" onclick="toggleCard(this)">
+        <h3>Cloud Tasks 큐 (m-engine-schedule-queue)</h3>
+        <button class="collapse-btn">▾</button>
+      </div>
+      <div class="card-body">
+        <div class="stat-row" id="taskQueueStats"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section-label">메일 발송 실패 (최근 24h)</div>
+  <div class="grid">
+    <div class="card full">
+      <div class="card-header" onclick="toggleCard(this)">
+        <h3>메일 실패 로그</h3>
+        <button class="collapse-btn">▾</button>
+      </div>
+      <div class="card-body">
+        <ul class="err-list" id="mailFailList"></ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="dashboard-auth.js"></script>
+<script>
+function toggleCard(headerEl){
+  headerEl.closest('.card').classList.toggle('collapsed');
+}
+
+function kpiCard(label, value){
+  return `<div class="kpi"><div class="label">${label}</div><div class="value">${value}</div></div>`;
+}
+
+function fmt(n){
+  return (n === null || n === undefined) ? '—' : Number(n).toLocaleString();
+}
+
+function timeAgo(iso){
+  if(!iso) return '—';
+  const diffMin = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
+  if(diffMin < 1) return '방금 전';
+  if(diffMin < 60) return `${diffMin}분 전`;
+  const h = Math.floor(diffMin/60);
+  if(h < 24) return `${h}시간 전`;
+  return `${Math.floor(h/24)}일 전`;
+}
+
+let charts = {};
+function destroy(id){ if(charts[id]) charts[id].destroy(); }
+function barChart(id, labels, data, color){
+  destroy(id);
+  charts[id] = new Chart(document.getElementById(id), {
+    type:'bar',
+    data:{ labels, datasets:[{ data, backgroundColor:color, borderRadius:4, barThickness:34 }] },
+    options:{
+      responsive:true, maintainAspectRatio:true,
+      plugins:{ legend:{ display:false } },
+      scales:{
+        x:{ ticks:{ color:'#8996A5', font:{family:'IBM Plex Mono', size:10.5} }, grid:{ display:false } },
+        y:{ ticks:{ color:'#5B6672', font:{size:10} }, grid:{ color:'#1B222B' } }
+      }
+    }
+  });
+}
+
+function groupedBarChart(id, labels, datasets){
+  destroy(id);
+  charts[id] = new Chart(document.getElementById(id), {
+    type:'bar',
+    data:{ labels, datasets },
+    options:{
+      responsive:true, maintainAspectRatio:true,
+      plugins:{ legend:{ labels:{ color:'#8996A5', font:{family:'IBM Plex Mono', size:10.5} } } },
+      scales:{
+        x:{ ticks:{ color:'#8996A5', font:{family:'IBM Plex Mono', size:10.5} }, grid:{ display:false } },
+        y:{ ticks:{ color:'#5B6672', font:{size:10} }, grid:{ color:'#1B222B' } }
+      }
+    }
+  });
+}
+
+function errListHTML(errors){
+  if(!errors || errors.length === 0) return '<div class="empty">최근 24시간 에러 없음</div>';
+  return errors.map(e => `
+    <li>
+      <span class="msg"><span class="sev" style="background:#EF4B5F"></span>${e.message}</span>
+      <span class="meta">${timeAgo(e.timestamp)}</span>
+    </li>`).join('');
+}
+
+function renderHosting(hosting){
+  const grid = document.getElementById('hostingGrid');
+  if(!hosting || hosting.length === 0){
+    grid.innerHTML = '<div class="empty">호스팅 데이터 없음</div>';
+    return;
+  }
+  grid.innerHTML = hosting.map((site, i) => `
+    <div class="card">
+      <div class="card-header" onclick="toggleCard(this)">
+        <h3>${site.label}</h3>
+        <button class="collapse-btn">▾</button>
+      </div>
+      <div class="card-body">
+        <div class="stat-row">
+          <div class="stat"><div class="n">${fmt(site.traffic?.requestCount)}</div><div class="l">요청 수 (24h)</div></div>
+          <div class="stat"><div class="n">${site.traffic?.sentBytesMB != null ? site.traffic.sentBytesMB + ' MB' : '—'}</div><div class="l">전송량 (24h)</div></div>
+        </div>
+        ${site.traffic?.requestCount == null ? '<div class="empty">⚠️ 이 지표는 현재 Cloud Monitoring에서 조회되지 않습니다 (Hosting 트래픽 지표 미지원 가능성)</div>' : ''}
+        <ul class="err-list">${errListHTML(site.errors)}</ul>
+      </div>
+    </div>`).join('');
+}
+
+function renderCloudRun(cloudRun){
+  const grid = document.getElementById('cloudRunGrid');
+  if(!cloudRun || cloudRun.length === 0){
+    grid.innerHTML = '<div class="empty">Cloud Run 데이터 없음</div>';
+    return;
+  }
+  grid.innerHTML = cloudRun.map((svc, i) => `
+    <div class="card">
+      <div class="card-header" onclick="toggleCard(this)">
+        <h3>${svc.label}
+          ${svc.health ? (svc.health.ok
+            ? '<span class="badge badge-ok">정상</span>'
+            : '<span class="badge badge-danger">응답 없음</span>') : ''}
+        </h3>
+        <button class="collapse-btn">▾</button>
+      </div>
+      <div class="card-body">
+        <div class="stat-row">
+          <div class="stat"><div class="n">${fmt(svc.stats?.requestCount)}</div><div class="l">요청 수 (24h)</div></div>
+          <div class="stat"><div class="n">${svc.stats?.avgLatencyMs != null ? svc.stats.avgLatencyMs + ' ms' : '—'}</div><div class="l">평균 지연시간</div></div>
+        </div>
+        <ul class="err-list">${errListHTML(svc.errors)}</ul>
+      </div>
+    </div>`).join('');
+
+  barChart('chartCloudRun',
+    cloudRun.map(s => s.label),
+    cloudRun.map(s => s.stats?.requestCount || 0),
+    '#5EA1FF');
+}
+
+function renderFunctions(functions){
+  const grid = document.getElementById('functionsGrid');
+  if(!functions || functions.length === 0){
+    grid.innerHTML = '<div class="empty">Functions 데이터 없음</div>';
+    return;
+  }
+  grid.innerHTML = functions.map((fn) => {
+    const gen = fn.generationCheck;
+    const genBadge = gen
+      ? (gen.warning
+          ? `<span class="badge badge-warn">⚠️ ${gen.generation}</span>`
+          : `<span class="badge badge-ok">${gen.generation}</span>`)
+      : '';
+    return `
+    <div class="card">
+      <div class="card-header" onclick="toggleCard(this)">
+        <h3>${fn.label} ${genBadge}</h3>
+        <button class="collapse-btn">▾</button>
+      </div>
+      <div class="card-body">
+        <div class="stat-row">
+          <div class="stat"><div class="n">${fmt(fn.stats?.executions)}</div><div class="l">호출 수 (24h)</div></div>
+          <div class="stat"><div class="n">${fmt(fn.stats?.errors)}</div><div class="l">에러 수 (24h)</div></div>
+        </div>
+        ${gen && gen.warning ? '<div class="empty">⚠️ 1st Gen 함수 — Node 22 비호환 위험, 재배포 필요 (m-event README 참고)</div>' : ''}
+        <ul class="err-list">${errListHTML(fn.errors)}</ul>
+      </div>
+    </div>`;
+  }).join('');
+
+  groupedBarChart('chartFunctions',
+    functions.map(f => f.label),
+    [
+      { label:'호출 수', data: functions.map(f => f.stats?.executions || 0), backgroundColor:'#5EA1FF', borderRadius:4 },
+      { label:'에러 수', data: functions.map(f => f.stats?.errors || 0), backgroundColor:'#EF4B5F', borderRadius:4 },
+    ]);
+}
+
+function renderScheduler(schedulerJobs){
+  const list = document.getElementById('schedulerList');
+  if(!schedulerJobs || schedulerJobs.error){
+    list.innerHTML = `<li class="empty">조회 실패: ${schedulerJobs?.error || '알 수 없음'}</li>`;
+    return;
+  }
+  if(schedulerJobs.length === 0){
+    list.innerHTML = '<li class="empty">등록된 잡 없음</li>';
+    return;
+  }
+  list.innerHTML = schedulerJobs.map(j => `
+    <li>
+      <span class="msg">
+        <span class="sev" style="background:${j.lastAttemptOk ? '#2DD4BF' : '#EF4B5F'}"></span>
+        ${j.name} <span style="color:#5B6672">(${j.schedule})</span>
+        ${j.state !== 'ENABLED' ? `<span class="badge badge-warn">${j.state}</span>` : ''}
+      </span>
+      <span class="meta">마지막 실행 ${timeAgo(j.lastAttemptTime)}</span>
+    </li>`).join('');
+}
+
+function renderTaskQueue(taskQueue){
+  const el = document.getElementById('taskQueueStats');
+  if(!taskQueue || taskQueue.error){
+    el.innerHTML = `<div class="empty">조회 실패: ${taskQueue?.error || '알 수 없음'}</div>`;
+    return;
+  }
+  const stateBadge = taskQueue.state === 'RUNNING'
+    ? '<span class="badge badge-ok">RUNNING</span>'
+    : `<span class="badge badge-danger">${taskQueue.state}</span>`;
+  el.innerHTML = `
+    <div class="stat"><div class="n">${stateBadge}</div><div class="l">큐 상태</div></div>
+    <div class="stat"><div class="n">${fmt(taskQueue.pendingTasksApprox)}</div><div class="l">대기 중 작업 (대략)</div></div>
+  `;
+}
+
+function renderMailFailures(mailFailures){
+  document.getElementById('mailFailList').innerHTML = errListHTML(mailFailures);
+}
+
+function render(data){
+  document.getElementById('updatedAt').textContent =
+    '마지막 업데이트: ' + new Date(data.updatedAt).toLocaleString('ko-KR');
+
+  const totalRunRequests = (data.cloudRun || []).reduce((s, c) => s + (c.stats?.requestCount || 0), 0);
+  const totalFnExec = (data.functions || []).reduce((s, f) => s + (f.stats?.executions || 0), 0);
+  const totalFnErr = (data.functions || []).reduce((s, f) => s + (f.stats?.errors || 0), 0);
+  const genWarnings = (data.functions || []).filter(f => f.generationCheck?.warning).length;
+
+  document.getElementById('kpiRow').innerHTML =
+    kpiCard('Cloud Run 총 요청 (24h)', fmt(totalRunRequests)) +
+    kpiCard('Functions 총 호출 (24h)', fmt(totalFnExec)) +
+    kpiCard('Functions 총 에러 (24h)', fmt(totalFnErr)) +
+    kpiCard('1st Gen 경고', genWarnings);
+
+  renderHosting(data.hosting);
+  renderCloudRun(data.cloudRun);
+  renderFunctions(data.functions);
+  renderScheduler(data.schedulerJobs);
+  renderTaskQueue(data.taskQueue);
+  renderMailFailures(data.mailFailures);
+}
+
+loadDashboard((data) => {
+  render(data);
+});
+</script>
+</body>
+</html>
