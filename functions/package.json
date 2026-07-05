@@ -1,5 +1,5 @@
 {
-  "name": "m-smart-monitor-backend",
+  "name": "m-smart-monitor",
   "version": "1.0.0",
   "description": "m-smart-90148 프로젝트(M-SMART, m-event, facility-dashboard, m-engine) 통합 모니터링",
   "main": "index.js",
