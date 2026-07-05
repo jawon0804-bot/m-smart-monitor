@@ -4,7 +4,7 @@
 const PROJECT_ID = 'm-smart-90148';
 const REGION = 'asia-northeast3'; // Cloud Run / Functions 리전
 
-// Cloud Scheduler 잡은 프로젝트의 App Engine 위치를 따라가서 별도입니다.
+// Cloud Scheduler 잡은 프로젝트의 App Engine 위치를 따라가서 별도입니다..
 // (콘솔에서 확인한 실제 값: us-central1)
 const SCHEDULER_REGION = 'us-central1';
 
