@@ -213,3 +213,51 @@ firebase deploy --only functions:collectMetrics,functions:getDashboardData
 
 `public/` 폴더 안 파일(`index.html`, `dashboard-auth.js`)은 브라우저에서만
 도는 정적 파일이라 배포 없이 저장 + 새로고침만으로 반영됩니다.
+
+## 11. GitHub Actions 자동 배포 (CI/CD)
+
+`main` 브랜치의 `functions/**` 경로가 바뀐 채로 push되면
+`.github/workflows/deploy.yml`이 자동으로 `firebase deploy`를 실행합니다.
+
+### 필요한 시크릿
+- `FIREBASE_SERVICE_ACCOUNT` — 배포용 서비스 계정(`github-action-...`)의
+  JSON 키 전체 내용. GitHub 리포 Settings → Secrets and variables →
+  Actions에 등록.
+
+### ⚠️ 배포용 서비스 계정에 추가로 필요했던 권한 4가지
+
+로컬 CLI로 배포할 때는 내 계정 권한으로 되지만, GitHub Actions는 별도
+서비스 계정(`github-action-1252276223@m-smart-90148.iam.gserviceaccount.com`)을
+쓰기 때문에, 처음 CI/CD를 연결했을 때 아래 권한들이 하나씩 없어서 배포가
+막혔습니다. 나중에 새 배포용 계정을 또 만들게 되면 이 4개를 한 번에
+부여하면 됩니다.
+
+```bash
+SA="github-action-1252276223@m-smart-90148.iam.gserviceaccount.com"
+
+# 1) 함수 런타임 계정을 대신 사용할 권한
+gcloud projects add-iam-policy-binding m-smart-90148 \
+  --member="serviceAccount:${SA}" --role="roles/iam.serviceAccountUser"
+
+# 2) API 키 시크릿 값 읽기
+gcloud secrets add-iam-policy-binding MONITOR_API_KEY \
+  --member="serviceAccount:${SA}" --role="roles/secretmanager.secretAccessor"
+
+# 3) API 키 시크릿 메타데이터 조회 (2번만으론 부족해서 추가로 필요했음)
+gcloud secrets add-iam-policy-binding MONITOR_API_KEY \
+  --member="serviceAccount:${SA}" --role="roles/secretmanager.viewer"
+
+# 4) 스케줄 함수(collectMetrics) 배포 시 Cloud Scheduler 잡도 같이 갱신하는데 필요
+gcloud projects add-iam-policy-binding m-smart-90148 \
+  --member="serviceAccount:${SA}" --role="roles/cloudscheduler.admin"
+```
+
+권한 하나가 빠지면 배포 로그에 정확히 어떤 리소스(secret, scheduler job
+등)에 대한 권한이 없는지 403 에러로 친절하게 나오니, 에러 메시지에 적힌
+리소스 이름을 보고 그에 맞는 역할을 추가하면 됩니다.
+
+### Cloud Run 콘솔에 서비스가 4개 뜨는 이유
+`collectMetrics`, `getDashboardData`는 2nd Gen Cloud Functions인데, 2nd
+Gen은 내부적으로 Cloud Run 위에서 실행되는 구조라 Cloud Run 콘솔에도
+같이 나타납니다. `facility-dashboard`, `m-engine`과 합쳐서 총 4개가
+보이는 게 정상이며, 중복 배포된 게 아닙니다.
