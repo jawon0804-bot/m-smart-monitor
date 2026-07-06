@@ -91,16 +91,41 @@
 </style>
 </head>
 <body>
+<div id="loading-overlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(11,15,20,0.75); backdrop-filter:blur(1px); z-index:9999; justify-content:center; align-items:center;">
+  <div style="text-align:center;">
+    <div style="width:44px; height:44px; border:4px solid #232C36; border-top:4px solid #2DD4BF; border-radius:50%; animation:spin 0.9s linear infinite; margin:0 auto 14px;"></div>
+    <div style="font-family:'IBM Plex Mono',monospace; font-size:12.5px; color:#8996A5;">데이터 불러오는 중...</div>
+  </div>
+</div>
+<style>@keyframes spin{to{transform:rotate(360deg);}}</style>
 <div class="main">
   <div class="topbar">
     <div>
       <h1>m-smart-90148 통합 모니터링</h1>
       <div class="sub" id="updatedAt">불러오는 중...</div>
     </div>
-    <span class="badge badge-ok" id="liveBadge">LIVE DATA</span>
+    <div style="display:flex; align-items:center; gap:10px;">
+      <button onclick="refreshDashboard()" style="background:#161D26; border:1px solid #232C36; color:#E7ECF1; padding:6px 12px; border-radius:6px; font-size:12px; cursor:pointer; font-family:inherit;">
+        ↻ 새로고침
+      </button>
+      <span class="badge badge-ok" id="liveBadge">LIVE DATA</span>
+    </div>
   </div>
 
   <div class="kpis" id="kpiRow"></div>
+
+  <div class="section-label">이번 달 사용 요금</div>
+  <div class="grid">
+    <div class="card full">
+      <div class="card-header" onclick="toggleCard(this)">
+        <h3>서비스별 요금 (당월 누적)</h3>
+        <button class="collapse-btn">▾</button>
+      </div>
+      <div class="card-body">
+        <ul class="plain-list" id="billingList"></ul>
+      </div>
+    </div>
+  </div>
 
   <div class="section-label">Firebase Hosting</div>
   <div class="grid" id="hostingGrid"></div>
@@ -383,6 +408,27 @@ function renderMailFailures(mailFailures){
   document.getElementById('mailFailList').innerHTML = errListHTML(mailFailures);
 }
 
+function renderBilling(billing){
+  const el = document.getElementById('billingList');
+  if(!billing || !billing.available){
+    el.innerHTML = `<li class="empty">아직 조회 불가 — ${billing?.reason || '결제 내보내기 설정 필요'}</li>`;
+    return;
+  }
+  if(!billing.byService || billing.byService.length === 0){
+    el.innerHTML = '<li class="empty">이번 달 사용 내역 없음</li>';
+    return;
+  }
+  el.innerHTML = billing.byService.map(s => `
+    <li>
+      <span class="msg">${escapeHtml(s.service)}</span>
+      <span class="meta">$${s.cost}</span>
+    </li>`).join('') +
+    `<li style="border-top:1px solid var(--line); margin-top:4px; padding-top:10px;">
+      <span class="msg" style="font-weight:600;">합계</span>
+      <span class="meta" style="color:var(--text); font-weight:600;">$${billing.totalCost} ${billing.currency}</span>
+    </li>`;
+}
+
 function render(data){
   document.getElementById('updatedAt').textContent =
     '마지막 업데이트: ' + new Date(data.updatedAt).toLocaleString('ko-KR');
@@ -396,8 +442,10 @@ function render(data){
     kpiCard('Cloud Run 총 요청 (24h)', fmt(totalRunRequests)) +
     kpiCard('Functions 총 호출 (24h)', fmt(totalFnExec)) +
     kpiCard('Functions 총 에러 (24h)', fmt(totalFnErr)) +
-    kpiCard('1st Gen 경고', genWarnings);
+    kpiCard('1st Gen 경고', genWarnings) +
+    kpiCard('이번 달 사용 요금', data.billing?.available ? `$${data.billing.totalCost}` : 'N/A');
 
+  renderBilling(data.billing);
   renderHosting(data.hosting);
   renderCloudRun(data.cloudRun);
   renderFunctions(data.functions);
@@ -406,9 +454,30 @@ function render(data){
   renderMailFailures(data.mailFailures);
 }
 
-loadDashboard((data) => {
-  render(data);
-});
+function showLoading(){
+  document.getElementById('loading-overlay').style.display = 'flex';
+}
+function hideLoading(){
+  document.getElementById('loading-overlay').style.display = 'none';
+}
+
+// dashboard-auth.js의 fetchDashboardData()를 직접 사용해서, 에러가 나도
+// finally에서 반드시 스피너가 꺼지도록 처리합니다 (loadDashboard()의 콜백 방식은
+// 실패 시 콜백 자체가 호출 안 돼서 스피너가 계속 떠 있는 문제가 있었음).
+async function refreshDashboard(){
+  showLoading();
+  try {
+    const data = await fetchDashboardData();
+    render(data);
+  } catch (err) {
+    console.error(err);
+    alert(err.message);
+  } finally {
+    hideLoading();
+  }
+}
+
+refreshDashboard();
 </script>
 </body>
 </html>
