@@ -7,6 +7,13 @@ on:
     paths:
       - 'functions/**'
 
+# 같은 워크플로가 동시에 두 개 이상 돌지 않도록 막습니다.
+# 짧은 시간에 커밋을 여러 번 푸시해도, 이전 배포가 끝날 때까지
+# 다음 배포는 대기했다가 순서대로 실행됩니다 (Cloud Functions 409 충돌 방지).
+concurrency:
+  group: firebase-deploy
+  cancel-in-progress: false
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -25,6 +32,11 @@ jobs:
 
       - name: 서비스 계정 키 파일 생성
         run: echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' > /tmp/gcp-key.json
+
+      - name: 대시보드 API 키 자동 주입
+        working-directory: functions/public
+        run: |
+          sed -i "s/__MONITOR_API_KEY__/${{ secrets.MONITOR_API_KEY }}/" dashboard-auth.js
 
       - name: Firebase Functions + Hosting(monitor) 배포
         working-directory: functions
