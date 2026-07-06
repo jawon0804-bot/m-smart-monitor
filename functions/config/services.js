@@ -43,6 +43,13 @@ const TASKS_QUEUE = {
 // ⚠️ Firestore 보안 규칙에 이 경로는 클라이언트 접근 금지를 명시해야 함 (SETUP_GUIDE 참고).
 const CACHE_DOC_PATH = '_monitor/latest';
 
+// 이번 달 사용 요금 조회용 BigQuery 결제 내보내기 테이블.
+// GCP 콘솔 > 결제 > 결제 내보내기에서 BigQuery 내보내기를 켠 뒤,
+// 거기서 알려주는 실제 테이블 이름으로 바꿔주세요.
+// 설정 전이거나 아직 데이터가 안 쌓였으면 costWidget은 자동으로 "N/A"를 반환합니다.
+const BILLING_EXPORT_TABLE =
+  'm-smart-90148.billing_export.gcp_billing_export_v1_XXXXXX_XXXXXX_XXXXXX';
+
 module.exports = {
   PROJECT_ID,
   REGION,
@@ -53,4 +60,5 @@ module.exports = {
   KNOWN_SCHEDULER_JOB_PREFIXES,
   TASKS_QUEUE,
   CACHE_DOC_PATH,
+  BILLING_EXPORT_TABLE,
 };
