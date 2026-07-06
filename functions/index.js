@@ -10,8 +10,8 @@ const {
   CACHE_DOC_PATH,
 } = require('./config/services');
 
-const { getHostingStats, getCloudRunStats, getFunctionStats } = require('./lib/monitoring');
-const { getRecentErrors, getMailFailures } = require('./lib/logging');
+const { getCloudRunStats, getFunctionStats } = require('./lib/monitoring');
+const { getRecentErrors, getMailFailures, getHostingTraffic, getHostingErrors } = require('./lib/logging');
 const { getSchedulerJobs } = require('./lib/scheduler');
 const { getQueueStatus } = require('./lib/tasks');
 const { checkFunctionGeneration, checkServiceHealth } = require('./lib/knownIssues');
@@ -26,8 +26,8 @@ async function collectHosting() {
     HOSTING_SITES.map(async (site) => ({
       id: site.id,
       label: site.label,
-      traffic: await getHostingStats(site.id),
-      errors: await getRecentErrors('firebase_hosting', site.id).catch(() => []),
+      traffic: await getHostingTraffic(site.domain).catch((e) => ({ error: String(e.message || e) })),
+      errors: await getHostingErrors(site.domain).catch(() => []),
     }))
   );
 }
