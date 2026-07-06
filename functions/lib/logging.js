@@ -3,7 +3,7 @@ const { PROJECT_ID } = require('../config/services');
 
 const logging = new Logging({ projectId: PROJECT_ID });
 
-const MAX_MESSAGE_LENGTH = 300;
+const MAX_MESSAGE_LENGTH = 500;
 
 // Cloud Logging이 주는 timestamp는 상황에 따라 Date, PreciseDate, 문자열,
 // 또는 {seconds, nanos} 형태의 protobuf 구조로 들어올 수 있어서, 화면에서
