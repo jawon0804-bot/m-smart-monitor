@@ -48,7 +48,7 @@ const CACHE_DOC_PATH = '_monitor/latest';
 // 거기서 알려주는 실제 테이블 이름으로 바꿔주세요.
 // 설정 전이거나 아직 데이터가 안 쌓였으면 costWidget은 자동으로 "N/A"를 반환합니다.
 const BILLING_EXPORT_TABLE =
-  'm-smart-90148.billing_export.gcp_billing_export_v1_XXXXXX_XXXXXX_XXXXXX';
+  'm-smart-90148.billing_export.gcp_billing_export_v1_019845_A12266_E9FE4D';
 
 module.exports = {
   PROJECT_ID,
