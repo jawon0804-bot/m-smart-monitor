@@ -1,5 +1,14 @@
 {
   "projects": {
     "default": "m-smart-90148"
+  },
+  "targets": {
+    "m-smart-90148": {
+      "hosting": {
+        "monitor": [
+          "m-smart-monitor"
+        ]
+      }
+    }
   }
 }
