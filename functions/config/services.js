@@ -9,8 +9,8 @@ const REGION = 'asia-northeast3'; // Cloud Run / Functions 리전
 const SCHEDULER_REGION = 'us-central1';
 
 const HOSTING_SITES = [
-  { id: 'm-smart-90148', label: 'M-SMART (점검 앱)' },
-  { id: 'm-smart-0804', label: 'm-event (이벤트 트래커)' },
+  { id: 'm-smart-90148', domain: 'm-smart-90148.web.app', label: 'M-SMART (점검 앱)' },
+  { id: 'm-smart-0804', domain: 'm-smart-0804.web.app', label: 'm-event (이벤트 트래커)' },
 ];
 
 const CLOUD_RUN_SERVICES = [
