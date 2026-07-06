@@ -229,11 +229,23 @@ function groupedBarChart(id, labels, datasets){
   });
 }
 
+function escapeHtml(s){
+  return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+// 메시지 안의 URL(주로 Firestore 인덱스 생성 링크 등)을 클릭 가능한 링크로 변환
+function linkifyMessage(msg){
+  const escaped = escapeHtml(msg);
+  return escaped.replace(/https?:\/\/[^\s<]+/g, (url) =>
+    `<a href="${url}" target="_blank" rel="noopener" style="color:var(--accent-2); text-decoration:underline;">${url}</a>`
+  );
+}
+
 function errListHTML(errors){
   if(!errors || errors.length === 0) return '<div class="empty">최근 24시간 에러 없음</div>';
   return errors.map(e => `
     <li>
-      <span class="msg"><span class="sev" style="background:#EF4B5F"></span>${e.message}</span>
+      <span class="msg"><span class="sev" style="background:#EF4B5F"></span>${linkifyMessage(e.message)}</span>
       <span class="meta">${timeAgo(e.timestamp)}</span>
     </li>`).join('');
 }
