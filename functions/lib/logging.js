@@ -47,4 +47,49 @@ async function getMailFailures(maxResults = 5) {
   return queryLogs(filter, maxResults);
 }
 
-module.exports = { getRecentErrors, getMailFailures };
+// Firebase Hosting은 Cloud Monitoring에 지표를 안 내보내고, 대신 Cloud Logging으로
+// 요청 로그(logName: webrequests, resource.type: firebase_domain)를 보냅니다.
+// ⚠️ 사전 조건: Firebase 콘솔 > 프로젝트 설정 > 통합 > Cloud Logging에서
+// 해당 호스팅 사이트의 로그 내보내기를 먼저 "연결"해야 데이터가 쌓입니다.
+// (연결 전에는 로그 자체가 없어서 이 함수는 항상 0을 반환합니다.)
+async function getHostingTraffic(hostname, windowMinutes = 1440) {
+  const filter = [
+    'resource.type="firebase_domain"',
+    `jsonPayload.hostname="${hostname}"`,
+    'timestamp>="' + new Date(Date.now() - windowMinutes * 60 * 1000).toISOString() + '"',
+  ].join(' AND ');
+
+  let requestCount = 0;
+  let totalBytes = 0;
+
+  let [entries, nextQuery] = await logging.getEntries({ filter, pageSize: 1000 });
+
+  // 트래픽이 많으면 페이지가 여러 장 나올 수 있어 전부 순회합니다.
+  // (내부 도구 규모 기준으로는 충분히 감당 가능한 수준입니다)
+  // eslint-disable-next-line no-constant-condition
+  while (true) {
+    requestCount += entries.length;
+    for (const entry of entries) {
+      const size = entry.metadata?.httpRequest?.responseSize;
+      if (size) totalBytes += Number(size);
+    }
+    if (!nextQuery) break;
+    [entries, nextQuery] = await logging.getEntries(nextQuery);
+  }
+
+  return { requestCount, sentBytesMB: +(totalBytes / (1024 * 1024)).toFixed(2) };
+}
+
+// Hosting은 리소스 라벨 구조가 달라서(firebase_domain + hostname) 별도 함수로 분리
+async function getHostingErrors(hostname, maxResults = 5) {
+  const filter = [
+    'resource.type="firebase_domain"',
+    `jsonPayload.hostname="${hostname}"`,
+    'httpRequest.status>=500',
+    'timestamp>="' + new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString() + '"',
+  ].join(' AND ');
+
+  return queryLogs(filter, maxResults);
+}
+
+module.exports = { getRecentErrors, getMailFailures, getHostingTraffic, getHostingErrors };

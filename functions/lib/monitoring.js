@@ -65,24 +65,6 @@ async function safe(label, fn) {
   }
 }
 
-// Firebase Hosting 사이트별 트래픽. siteId로 필터링.
-// ⚠️ Firebase Hosting은 Cloud Run/Functions와 달리 Cloud Monitoring에
-// 트래픽 지표를 기본으로 내보내지 않을 수 있습니다. 계속 null이 나오면
-// 이 지표 자체가 프로젝트에서 지원 안 되는 것일 수 있어요 (로그 메시지로 확인).
-async function getHostingStats(siteId, windowMinutes = 1440) {
-  const filterExtra = ` AND resource.labels.site="${siteId}"`;
-  const requestCount = await safe(`hosting:${siteId}:requests`, () =>
-    sumMetric('firebasehosting.googleapis.com/network/request_count', windowMinutes, filterExtra)
-  );
-  const sentBytes = await safe(`hosting:${siteId}:bytes`, () =>
-    sumMetric('firebasehosting.googleapis.com/network/sent_bytes_count', windowMinutes, filterExtra)
-  );
-  return {
-    requestCount,
-    sentBytesMB: sentBytes != null ? +(sentBytes / (1024 * 1024)).toFixed(1) : null,
-  };
-}
-
 // Cloud Run 서비스별 요청 수 + 평균 지연시간
 async function getCloudRunStats(serviceName, windowMinutes = 1440) {
   const filterExtra = ` AND resource.labels.service_name="${serviceName}"`;
@@ -113,4 +95,4 @@ async function getFunctionStats(functionName, windowMinutes = 1440) {
   return { executions, errors };
 }
 
-module.exports = { getHostingStats, getCloudRunStats, getFunctionStats };
+module.exports = { getCloudRunStats, getFunctionStats };
