@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>m-smart-90148 모니터링.......</title>
+<title>m-smart-90148 모니터링</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <style>
   :root{
@@ -253,7 +253,8 @@ function renderHosting(hosting){
           <div class="stat"><div class="n">${fmt(site.traffic?.requestCount)}</div><div class="l">요청 수 (24h)</div></div>
           <div class="stat"><div class="n">${site.traffic?.sentBytesMB != null ? site.traffic.sentBytesMB + ' MB' : '—'}</div><div class="l">전송량 (24h)</div></div>
         </div>
-        ${site.traffic?.requestCount == null ? '<div class="empty">⚠️ 이 지표는 현재 Cloud Monitoring에서 조회되지 않습니다 (Hosting 트래픽 지표 미지원 가능성)</div>' : ''}
+        ${site.traffic?.error ? '<div class="empty">⚠️ 조회 실패 — Firebase 콘솔에서 이 사이트가 Cloud Logging에 연결되어 있는지 확인하세요 (프로젝트 설정 → 통합 → Cloud Logging)</div>' : ''}
+        ${!site.traffic?.error && site.traffic?.requestCount === 0 ? '<div class="empty">아직 로그가 없음 — 연동 직후라면 최대 30분 정도 걸릴 수 있어요</div>' : ''}
         <ul class="err-list">${errListHTML(site.errors)}</ul>
       </div>
     </div>`).join('');
