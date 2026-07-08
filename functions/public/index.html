@@ -192,6 +192,29 @@
       </div>
     </div>
   </div>
+
+  <div class="section-label">로그인 현황 (M-SMART / m-event)</div>
+  <div class="grid">
+    <div class="card full">
+      <div class="card-header" onclick="toggleCard(this)">
+        <h3>로그인 시도 통계 (24h)</h3>
+        <button class="collapse-btn">▾</button>
+      </div>
+      <div class="card-body">
+        <div class="stat-row" id="loginStatsRow"></div>
+        <ul class="plain-list" id="loginByAppList"></ul>
+      </div>
+    </div>
+    <div class="card full">
+      <div class="card-header" onclick="toggleCard(this)">
+        <h3>현재 잠긴 계정</h3>
+        <button class="collapse-btn">▾</button>
+      </div>
+      <div class="card-body">
+        <ul class="plain-list" id="lockoutList"></ul>
+      </div>
+    </div>
+  </div>
 </div>
 
 <script src="dashboard-auth.js"></script>
@@ -218,6 +241,17 @@ function timeAgo(iso){
   const h = Math.floor(diffMin/60);
   if(h < 24) return `${h}시간 전`;
   return `${Math.floor(h/24)}일 전`;
+}
+
+function timeUntil(iso){
+  if(!iso) return '—';
+  const t = new Date(iso).getTime();
+  if(isNaN(t)) return '—';
+  const diffMin = Math.round((t - Date.now()) / 60000);
+  if(diffMin <= 0) return '곧';
+  if(diffMin < 60) return `${diffMin}분 후`;
+  const h = Math.floor(diffMin/60);
+  return `${h}시간 ${diffMin % 60}분 후`;
 }
 
 let charts = {};
@@ -408,6 +442,51 @@ function renderMailFailures(mailFailures){
   document.getElementById('mailFailList').innerHTML = errListHTML(mailFailures);
 }
 
+function statBlock(n, l){
+  return `<div class="stat"><div class="n">${n}</div><div class="l">${l}</div></div>`;
+}
+
+function renderLoginStats(loginStats){
+  const rowEl = document.getElementById('loginStatsRow');
+  const listEl = document.getElementById('loginByAppList');
+
+  if(!loginStats || loginStats.error){
+    rowEl.innerHTML = '';
+    listEl.innerHTML = `<li class="empty">조회 실패: ${loginStats?.error || '알 수 없음'}</li>`;
+    return;
+  }
+
+  rowEl.innerHTML =
+    statBlock(fmt(loginStats.total), '총 시도') +
+    statBlock(fmt(loginStats.success), '성공') +
+    statBlock(fmt(loginStats.fail), '실패') +
+    statBlock(fmt(loginStats.blocked), '차단됨(잠금 중 시도)');
+
+  const apps = Object.entries(loginStats.byApp || {});
+  if(apps.length === 0){
+    listEl.innerHTML = '<li class="empty">앱별 데이터 없음</li>';
+    return;
+  }
+  listEl.innerHTML = apps.map(([app, s]) => `
+    <li>
+      <span class="msg">${escapeHtml(app)}</span>
+      <span class="meta">총 ${s.total} · 성공 ${s.success} · 실패 ${s.fail}</span>
+    </li>`).join('');
+}
+
+function renderLockouts(activeLockouts){
+  const el = document.getElementById('lockoutList');
+  if(!activeLockouts || activeLockouts.length === 0){
+    el.innerHTML = '<li class="empty">현재 잠긴 계정 없음</li>';
+    return;
+  }
+  el.innerHTML = activeLockouts.map(l => `
+    <li>
+      <span class="msg"><span class="sev" style="background:#F5A623"></span>${escapeHtml(l.name)} <span style="color:var(--sub)">(실패 ${l.failCount}회)</span></span>
+      <span class="meta">${timeUntil(l.lockedUntil)} 해제</span>
+    </li>`).join('');
+}
+
 function renderBilling(billing){
   const el = document.getElementById('billingList');
   if(!billing || !billing.available){
@@ -421,11 +500,11 @@ function renderBilling(billing){
   el.innerHTML = billing.byService.map(s => `
     <li>
       <span class="msg">${escapeHtml(s.service)}</span>
-      <span class="meta">$${s.cost}</span>
+      <span class="meta">${s.cost} ${billing.currency}</span>
     </li>`).join('') +
     `<li style="border-top:1px solid var(--line); margin-top:4px; padding-top:10px;">
       <span class="msg" style="font-weight:600;">합계</span>
-      <span class="meta" style="color:var(--text); font-weight:600;">$${billing.totalCost} ${billing.currency}</span>
+      <span class="meta" style="color:var(--text); font-weight:600;">${billing.totalCost} ${billing.currency}</span>
     </li>`;
 }
 
@@ -443,7 +522,7 @@ function render(data){
     kpiCard('Functions 총 호출 (24h)', fmt(totalFnExec)) +
     kpiCard('Functions 총 에러 (24h)', fmt(totalFnErr)) +
     kpiCard('1st Gen 경고', genWarnings) +
-    kpiCard('이번 달 사용 요금', data.billing?.available ? `$${data.billing.totalCost}` : 'N/A');
+    kpiCard('이번 달 사용 요금', data.billing?.available ? `${data.billing.totalCost} ${data.billing.currency}` : 'N/A');
 
   renderBilling(data.billing);
   renderHosting(data.hosting);
@@ -452,6 +531,8 @@ function render(data){
   renderScheduler(data.schedulerJobs);
   renderTaskQueue(data.taskQueue);
   renderMailFailures(data.mailFailures);
+  renderLoginStats(data.loginStats);
+  renderLockouts(data.activeLockouts);
 }
 
 function showLoading(){
