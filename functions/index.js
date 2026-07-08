@@ -16,6 +16,7 @@ const { getSchedulerJobs } = require('./lib/scheduler');
 const { getQueueStatus } = require('./lib/tasks');
 const { checkFunctionGeneration, checkServiceHealth } = require('./lib/knownIssues');
 const { getMonthToDateCost } = require('./lib/billing');
+const { getLoginStats, getActiveLockouts } = require('./lib/loginActivity');
 
 admin.initializeApp();
 
@@ -61,7 +62,7 @@ async function collectFunctions() {
 exports.collectMetrics = onSchedule(
   { schedule: 'every 10 minutes', timeoutSeconds: 300, memory: '512MiB' },
   async () => {
-    const [hosting, cloudRun, functions, schedulerJobs, taskQueue, mailFailures, billing] =
+    const [hosting, cloudRun, functions, schedulerJobs, taskQueue, mailFailures, billing, loginStats, activeLockouts] =
       await Promise.all([
         collectHosting(),
         collectCloudRun(),
@@ -70,6 +71,8 @@ exports.collectMetrics = onSchedule(
         getQueueStatus().catch((e) => ({ error: String(e) })),
         getMailFailures().catch(() => []),
         getMonthToDateCost().catch((e) => ({ available: false, reason: String(e) })),
+        getLoginStats().catch((e) => ({ error: String(e) })),
+        getActiveLockouts().catch(() => []),
       ]);
 
     await admin.firestore().doc(CACHE_DOC_PATH).set({
@@ -81,6 +84,8 @@ exports.collectMetrics = onSchedule(
       taskQueue,
       mailFailures,
       billing,
+      loginStats,
+      activeLockouts,
     });
   }
 );
