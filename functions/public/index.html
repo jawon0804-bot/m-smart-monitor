@@ -49,6 +49,7 @@
     color:#5B6672; margin:26px 0 10px; padding-top:6px; border-top:1px solid var(--line);
   }
   .grid{ display:grid; grid-template-columns:1fr 1fr; gap:16px; align-items:start; }
+  .grid + .grid{ margin-top:16px; }
   .card{ background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:0; overflow:hidden; }
   .card.full{ grid-column:1 / -1; }
   .card-header{
@@ -333,7 +334,7 @@ function renderHosting(hosting){
     </div>`).join('');
 }
 
-function renderCloudRun(cloudRun){
+function renderCloudRun(cloudRun, hosting){
   const grid = document.getElementById('cloudRunGrid');
   if(!cloudRun || cloudRun.length === 0){
     grid.innerHTML = '<div class="empty">Cloud Run 데이터 없음</div>';
@@ -358,9 +359,14 @@ function renderCloudRun(cloudRun){
       </div>
     </div>`).join('');
 
+  const hostingLabels = (hosting || []).map(s => s.label);
+  const hostingCounts = (hosting || []).map(s => s.traffic?.requestCount || 0);
+  const runLabels = cloudRun.map(s => s.label);
+  const runCounts = cloudRun.map(s => s.stats?.requestCount || 0);
+
   barChart('chartCloudRun',
-    cloudRun.map(s => s.label),
-    cloudRun.map(s => s.stats?.requestCount || 0),
+    [...hostingLabels, ...runLabels],
+    [...hostingCounts, ...runCounts],
     '#5EA1FF');
 }
 
@@ -526,7 +532,7 @@ function render(data){
 
   renderBilling(data.billing);
   renderHosting(data.hosting);
-  renderCloudRun(data.cloudRun);
+  renderCloudRun(data.cloudRun, data.hosting);
   renderFunctions(data.functions);
   renderScheduler(data.schedulerJobs);
   renderTaskQueue(data.taskQueue);
