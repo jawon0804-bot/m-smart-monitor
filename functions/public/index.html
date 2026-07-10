@@ -4,6 +4,14 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>m-smart-90148 모니터링</title>
+<script>
+  (function(){
+    try{
+      const saved = localStorage.getItem('dashboardTheme');
+      if(saved === 'light') document.documentElement.setAttribute('data-theme','light');
+    }catch(e){}
+  })();
+</script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <style>
   :root{
@@ -20,6 +28,20 @@
     --mono:'IBM Plex Mono', monospace;
     --sans:'IBM Plex Sans', sans-serif;
   }
+  html[data-theme="light"]{
+    --bg:#F5F7FA;
+    --panel:#FFFFFF;
+    --panel-2:#EEF1F5;
+    --line:#DCE2E8;
+    --text:#1B2430;
+    --sub:#5B6672;
+    --accent:#0E9488;
+    --accent-2:#2F6FE4;
+    --warn:#B9770E;
+    --danger:#C82F45;
+  }
+  body{ transition:background-color .15s ease, color .15s ease; }
+  .card, .kpi, .btn{ transition:background-color .15s ease, border-color .15s ease, color .15s ease; }
   @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
   *{box-sizing:border-box;}
   body{
@@ -38,6 +60,17 @@
   .badge-ok{ color:var(--accent); background:#0F2A26; border:1px solid #164A40; }
   .badge-warn{ color:var(--warn); background:#2A2211; border:1px solid #4A3B14; }
   .badge-danger{ color:var(--danger); background:#2A1216; border:1px solid #4A1B22; }
+  html[data-theme="light"] .badge-ok{ background:#DFF6F1; border-color:#B7E9DE; }
+  html[data-theme="light"] .badge-warn{ background:#FCEFD9; border-color:#F3D8A2; }
+  html[data-theme="light"] .badge-danger{ background:#FBE1E5; border-color:#F3B9C1; }
+
+  .btn{
+    background:var(--panel-2); border:1px solid var(--line); color:var(--text);
+    padding:6px 12px; border-radius:6px; font-size:12px; cursor:pointer;
+    font-family:inherit; display:inline-flex; align-items:center; gap:6px;
+  }
+  .btn:hover{ filter:brightness(1.2); }
+  html[data-theme="light"] .btn:hover{ filter:brightness(0.97); background:#E4E9EF; }
 
   .kpis{ display:grid; grid-template-columns:repeat(5,1fr); gap:12px; margin-bottom:22px; }
   .kpi{ background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:14px 16px; min-width:0; }
@@ -106,9 +139,9 @@
       <div class="sub" id="updatedAt">불러오는 중...</div>
     </div>
     <div style="display:flex; align-items:center; gap:10px;">
-      <button onclick="refreshDashboard()" style="background:#161D26; border:1px solid #232C36; color:#E7ECF1; padding:6px 12px; border-radius:6px; font-size:12px; cursor:pointer; font-family:inherit;">
-        ↻ 새로고침
-      </button>
+      <button class="btn" onclick="refreshDashboard()">↻ 새로고침</button>
+      <button class="btn" onclick="toggleTheme()" id="themeToggleBtn" title="다크/라이트 모드">🌙 다크</button>
+      <button class="btn" onclick="toggleFullscreen()" id="fullscreenBtn" title="전체화면">⛶ 전체화면</button>
       <span class="badge badge-ok" id="liveBadge">LIVE DATA</span>
     </div>
   </div>
@@ -128,14 +161,11 @@
     </div>
   </div>
 
-  <div class="section-label">Firebase Hosting</div>
-  <div class="grid" id="hostingGrid"></div>
-
-  <div class="section-label">Cloud Run</div>
+  <div class="section-label">서비스별 요청 수 비교 (24h)</div>
   <div class="grid">
     <div class="card full">
       <div class="card-header" onclick="toggleCard(this)">
-        <h3>서비스별 요청 수 비교 (24h)</h3>
+        <h3>M-SMART / m-event / Dashboard / M-Engine 요청 수</h3>
         <button class="collapse-btn">▾</button>
       </div>
       <div class="card-body">
@@ -143,6 +173,11 @@
       </div>
     </div>
   </div>
+
+  <div class="section-label">Firebase Hosting</div>
+  <div class="grid" id="hostingGrid"></div>
+
+  <div class="section-label">Cloud Run</div>
   <div class="grid" id="cloudRunGrid"></div>
 
   <div class="section-label">Firebase Functions</div>
@@ -255,6 +290,13 @@ function timeUntil(iso){
   return `${h}시간 ${diffMin % 60}분 후`;
 }
 
+function isLightTheme(){
+  return document.documentElement.getAttribute('data-theme') === 'light';
+}
+function chartTickColor(){ return isLightTheme() ? '#5B6672' : '#8996A5'; }
+function chartAxisColor(){ return isLightTheme() ? '#8A94A0' : '#5B6672'; }
+function chartGridColor(){ return isLightTheme() ? '#E4E9EF' : '#1B222B'; }
+
 let charts = {};
 function destroy(id){ if(charts[id]) charts[id].destroy(); }
 function barChart(id, labels, data, color){
@@ -266,8 +308,8 @@ function barChart(id, labels, data, color){
       responsive:true, maintainAspectRatio:true,
       plugins:{ legend:{ display:false } },
       scales:{
-        x:{ ticks:{ color:'#8996A5', font:{family:'IBM Plex Mono', size:10.5} }, grid:{ display:false } },
-        y:{ ticks:{ color:'#5B6672', font:{size:10} }, grid:{ color:'#1B222B' } }
+        x:{ ticks:{ color:chartTickColor(), font:{family:'IBM Plex Mono', size:10.5} }, grid:{ display:false } },
+        y:{ ticks:{ color:chartAxisColor(), font:{size:10} }, grid:{ color:chartGridColor() } }
       }
     }
   });
@@ -280,10 +322,10 @@ function groupedBarChart(id, labels, datasets){
     data:{ labels, datasets },
     options:{
       responsive:true, maintainAspectRatio:true,
-      plugins:{ legend:{ labels:{ color:'#8996A5', font:{family:'IBM Plex Mono', size:10.5} } } },
+      plugins:{ legend:{ labels:{ color:chartTickColor(), font:{family:'IBM Plex Mono', size:10.5} } } },
       scales:{
-        x:{ ticks:{ color:'#8996A5', font:{family:'IBM Plex Mono', size:10.5} }, grid:{ display:false } },
-        y:{ ticks:{ color:'#5B6672', font:{size:10} }, grid:{ color:'#1B222B' } }
+        x:{ ticks:{ color:chartTickColor(), font:{family:'IBM Plex Mono', size:10.5} }, grid:{ display:false } },
+        y:{ ticks:{ color:chartAxisColor(), font:{size:10} }, grid:{ color:chartGridColor() } }
       }
     }
   });
@@ -514,7 +556,9 @@ function renderBilling(billing){
     </li>`;
 }
 
+let lastData = null;
 function render(data){
+  lastData = data;
   document.getElementById('updatedAt').textContent =
     '마지막 업데이트: ' + new Date(data.updatedAt).toLocaleString('ko-KR');
 
@@ -548,6 +592,38 @@ function hideLoading(){
   document.getElementById('loading-overlay').style.display = 'none';
 }
 
+function applyThemeButtonLabel(){
+  const btn = document.getElementById('themeToggleBtn');
+  btn.textContent = isLightTheme() ? '☀️ 라이트' : '🌙 다크';
+}
+
+function toggleTheme(){
+  const next = isLightTheme() ? 'dark' : 'light';
+  if(next === 'light'){
+    document.documentElement.setAttribute('data-theme','light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+  try{ localStorage.setItem('dashboardTheme', next); }catch(e){}
+  applyThemeButtonLabel();
+  if(lastData) render(lastData); // 차트 색상도 새 테마로 다시 그리기
+}
+
+function updateFullscreenButtonLabel(){
+  const btn = document.getElementById('fullscreenBtn');
+  btn.textContent = document.fullscreenElement ? '⛶ 나가기' : '⛶ 전체화면';
+}
+
+function toggleFullscreen(){
+  if(!document.fullscreenElement){
+    document.documentElement.requestFullscreen?.().catch(()=>{});
+  } else {
+    document.exitFullscreen?.();
+  }
+}
+
+document.addEventListener('fullscreenchange', updateFullscreenButtonLabel);
+
 // dashboard-auth.js의 fetchDashboardData()를 직접 사용해서, 에러가 나도
 // finally에서 반드시 스피너가 꺼지도록 처리합니다 (loadDashboard()의 콜백 방식은
 // 실패 시 콜백 자체가 호출 안 돼서 스피너가 계속 떠 있는 문제가 있었음).
@@ -564,6 +640,7 @@ async function refreshDashboard(){
   }
 }
 
+applyThemeButtonLabel();
 refreshDashboard();
 </script>
 </body>
