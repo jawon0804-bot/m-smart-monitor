@@ -76,18 +76,28 @@ SETUP_GUIDE.md                 처음 설치 순서
 
 ## 4. 인증 방식
 
-M-SMART/m-event/facility-dashboard는 Firebase Authentication을 안 쓰고
-Firestore(`UserDB`) 직접 조회 + HMAC 세션 토큰 방식이라, 대시보드 인증에
-재사용할 "Firebase 로그인 토큰"이 없습니다. 그래서:
+> ⚠️ **2026-07-11 정정**: 이 섹션은 예전에 "M-SMART/m-event/facility-dashboard가
+> Firebase Auth를 안 쓴다"는 전제로 쓰여 있었는데, 이후 세 서비스 모두 m-event의
+> `loginWithCredentials` Cloud Function을 통해 Firebase Auth Custom Token으로
+> 로그인하는 방식으로 이미 전환되어 있었음(자세한 건 상위 폴더 `system_map.md` 참고).
+> m-smart-monitor는 그 로그인 시스템을 재사용하지 않고 별도의 API 키 방식을 그대로 씀
+> — 아래는 "왜 그런가"가 아니라 "지금 실제로 어떻게 동작하는가"만 정확히 기술.
 
 - **`getDashboardData` API**: Secret Manager의 `MONITOR_API_KEY`로 보호
   (`x-api-key` 헤더)
-- **배포 시 자동 주입**: 로컬 코드(`dashboard-auth.js`)에는
-  `__MONITOR_API_KEY__` 자리표시자만 있고, GitHub Actions가 배포할 때
-  `MONITOR_API_KEY` 시크릿 값으로 치환해서 배포합니다. 로컬/리포에는 진짜 키가
-  안 남고, **배포 산출물에만** 존재합니다 (완전한 비공개는 아니라 "소스보기로
-  키를 볼 수는 있지만 리포에는 안 남는" 절충안).
-- 여러 명이 쓰게 되면 IAP나 관리자 로그인으로 업그레이드 권장.
+- **키 입력 방식 (자동 주입 아님)**: `dashboard-auth.js`는 최초 접속 시
+  `window.prompt()`로 관리자에게 키를 직접 물어보고, 입력받은 값을
+  `localStorage`에 저장해서 이후 요청에 재사용합니다. **소스 코드/배포
+  결과물 어디에도 키가 박혀있지 않아요** — view-source로는 안 보입니다.
+  (예전엔 `__MONITOR_API_KEY__` 자리표시자를 CI가 치환하는 방식으로
+  설계됐던 흔적이 `.github/workflows/deploy.yml`에 남아있었지만, 실제
+  `dashboard-auth.js`는 그 자리표시자를 쓴 적이 없어 그 배포 단계는
+  아무 동작도 안 하는 죽은 코드였음 — 지금은 정리함)
+- 그래도 여전히 "키 하나를 관리자 전원이 공유"하는 구조라, 최초 키 값을
+  누가 어떻게 안전하게 전달하는지는 별도 관리 필요(Secret Manager에서
+  `gcloud secrets versions access latest --secret=MONITOR_API_KEY`로 조회 후
+  구두/비밀번호 관리자 등으로 전달 권장). 여러 명이 쓰게 되면 IAP나
+  Firebase Auth 기반 개별 관리자 로그인으로 업그레이드 권장.
 
 ## 5. 알려진 위험 신호 자동 감지 (`knownIssues.js`)
 

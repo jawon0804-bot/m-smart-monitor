@@ -37,11 +37,6 @@ jobs:
       - name: 서비스 계정 키 파일 생성
         run: echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' > /tmp/gcp-key.json
 
-      - name: 대시보드 API 키 자동 주입
-        working-directory: functions/public
-        run: |
-          sed -i "s/__MONITOR_API_KEY__/${{ secrets.MONITOR_API_KEY }}/" dashboard-auth.js
-
       - name: Firebase Functions + Hosting(monitor) 배포
         working-directory: functions
         env:
