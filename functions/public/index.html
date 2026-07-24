@@ -71,6 +71,9 @@
   }
   .btn:hover{ filter:brightness(1.2); }
   html[data-theme="light"] .btn:hover{ filter:brightness(0.97); background:#E4E9EF; }
+  .btn.active{ background:var(--accent); color:#04211D; border-color:var(--accent); font-weight:600; }
+  html[data-theme="light"] .btn.active{ color:#04211D; }
+  .range-filter{ display:inline-flex; gap:4px; }
 
   .kpis{ display:grid; grid-template-columns:repeat(5,1fr); gap:12px; margin-bottom:22px; }
   .kpi{ background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:14px 16px; min-width:0; }
@@ -139,6 +142,11 @@
       <div class="sub" id="updatedAt">불러오는 중...</div>
     </div>
     <div style="display:flex; align-items:center; gap:10px;">
+      <div class="range-filter" id="rangeFilter">
+        <button class="btn active" data-range="daily" onclick="setRange('daily')">일별</button>
+        <button class="btn" data-range="weekly" onclick="setRange('weekly')">주별</button>
+        <button class="btn" data-range="monthly" onclick="setRange('monthly')">월별</button>
+      </div>
       <button class="btn" onclick="refreshDashboard()">↻ 새로고침</button>
       <button class="btn" onclick="toggleTheme()" id="themeToggleBtn" title="다크/라이트 모드">🌙 다크</button>
       <button class="btn" onclick="toggleFullscreen()" id="fullscreenBtn" title="전체화면">⛶ 전체화면</button>
@@ -161,7 +169,7 @@
     </div>
   </div>
 
-  <div class="section-label">서비스별 요청 수 비교 (24h)</div>
+  <div class="section-label" id="lbl-cloudrun-compare">서비스별 요청 수 비교 (24시간)</div>
   <div class="grid">
     <div class="card full">
       <div class="card-header" onclick="toggleCard(this)">
@@ -184,7 +192,7 @@
   <div class="grid">
     <div class="card full">
       <div class="card-header" onclick="toggleCard(this)">
-        <h3>함수별 호출/에러 비교 (24h)</h3>
+        <h3 id="lbl-fn-compare">함수별 호출/에러 비교 (24시간)</h3>
         <button class="collapse-btn">▾</button>
       </div>
       <div class="card-body">
@@ -216,7 +224,7 @@
     </div>
   </div>
 
-  <div class="section-label">메일 발송 실패 (최근 24h)</div>
+  <div class="section-label" id="lbl-mail">메일 발송 실패 (최근 24시간)</div>
   <div class="grid">
     <div class="card full">
       <div class="card-header" onclick="toggleCard(this)">
@@ -233,7 +241,7 @@
   <div class="grid">
     <div class="card full">
       <div class="card-header" onclick="toggleCard(this)">
-        <h3>로그인 시도 통계 (24h)</h3>
+        <h3 id="lbl-login">로그인 시도 통계 (24시간)</h3>
         <button class="collapse-btn">▾</button>
       </div>
       <div class="card-body">
@@ -343,8 +351,12 @@ function linkifyMessage(msg){
   );
 }
 
+const RANGE_LABEL = { daily: '24시간', weekly: '7일', monthly: '30일' };
+let currentRange = 'daily';
+function rangeLabel(){ return RANGE_LABEL[currentRange] || '24시간'; }
+
 function errListHTML(errors){
-  if(!errors || errors.length === 0) return '<div class="empty">최근 24시간 에러 없음</div>';
+  if(!errors || errors.length === 0) return `<div class="empty">최근 ${rangeLabel()} 에러 없음</div>`;
   return errors.map(e => `
     <li>
       <span class="msg"><span class="sev" style="background:#EF4B5F"></span>${linkifyMessage(e.message)}</span>
@@ -366,8 +378,8 @@ function renderHosting(hosting){
       </div>
       <div class="card-body">
         <div class="stat-row">
-          <div class="stat"><div class="n">${fmt(site.traffic?.requestCount)}</div><div class="l">요청 수 (24h)</div></div>
-          <div class="stat"><div class="n">${site.traffic?.sentBytesMB != null ? site.traffic.sentBytesMB + ' MB' : '—'}</div><div class="l">전송량 (24h)</div></div>
+          <div class="stat"><div class="n">${fmt(site.traffic?.requestCount)}</div><div class="l">요청 수 (${rangeLabel()})</div></div>
+          <div class="stat"><div class="n">${site.traffic?.sentBytesMB != null ? site.traffic.sentBytesMB + ' MB' : '—'}</div><div class="l">전송량 (${rangeLabel()})</div></div>
         </div>
         ${site.traffic?.error ? '<div class="empty">⚠️ 조회 실패 — Firebase 콘솔에서 이 사이트가 Cloud Logging에 연결되어 있는지 확인하세요 (프로젝트 설정 → 통합 → Cloud Logging)</div>' : ''}
         ${!site.traffic?.error && site.traffic?.requestCount === 0 ? '<div class="empty">아직 로그가 없음 — 연동 직후라면 최대 30분 정도 걸릴 수 있어요</div>' : ''}
@@ -394,7 +406,7 @@ function renderCloudRun(cloudRun, hosting){
       </div>
       <div class="card-body">
         <div class="stat-row">
-          <div class="stat"><div class="n">${fmt(svc.stats?.requestCount)}</div><div class="l">요청 수 (24h)</div></div>
+          <div class="stat"><div class="n">${fmt(svc.stats?.requestCount)}</div><div class="l">요청 수 (${rangeLabel()})</div></div>
           <div class="stat"><div class="n">${svc.stats?.avgLatencyMs != null ? svc.stats.avgLatencyMs + ' ms' : '—'}</div><div class="l">평균 지연시간</div></div>
         </div>
         <ul class="err-list">${errListHTML(svc.errors)}</ul>
@@ -433,8 +445,8 @@ function renderFunctions(functions){
       </div>
       <div class="card-body">
         <div class="stat-row">
-          <div class="stat"><div class="n">${fmt(fn.stats?.executions)}</div><div class="l">호출 수 (24h)</div></div>
-          <div class="stat"><div class="n">${fmt(fn.stats?.errors)}</div><div class="l">에러 수 (24h)</div></div>
+          <div class="stat"><div class="n">${fmt(fn.stats?.executions)}</div><div class="l">호출 수 (${rangeLabel()})</div></div>
+          <div class="stat"><div class="n">${fmt(fn.stats?.errors)}</div><div class="l">에러 수 (${rangeLabel()})</div></div>
         </div>
         ${gen && gen.warning ? '<div class="empty">⚠️ 1st Gen 함수 — Node 22 비호환 위험, 재배포 필요 (m-event README 참고)</div>' : ''}
         <ul class="err-list">${errListHTML(fn.errors)}</ul>
@@ -559,8 +571,14 @@ function renderBilling(billing){
 let lastData = null;
 function render(data){
   lastData = data;
+  currentRange = data.range || currentRange;
   document.getElementById('updatedAt').textContent =
     '마지막 업데이트: ' + new Date(data.updatedAt).toLocaleString('ko-KR');
+
+  document.getElementById('lbl-cloudrun-compare').textContent = `서비스별 요청 수 비교 (${rangeLabel()})`;
+  document.getElementById('lbl-fn-compare').textContent = `함수별 호출/에러 비교 (${rangeLabel()})`;
+  document.getElementById('lbl-mail').textContent = `메일 발송 실패 (최근 ${rangeLabel()})`;
+  document.getElementById('lbl-login').textContent = `로그인 시도 통계 (${rangeLabel()})`;
 
   const totalRunRequests = (data.cloudRun || []).reduce((s, c) => s + (c.stats?.requestCount || 0), 0);
   const totalFnExec = (data.functions || []).reduce((s, f) => s + (f.stats?.executions || 0), 0);
@@ -568,9 +586,9 @@ function render(data){
   const genWarnings = (data.functions || []).filter(f => f.generationCheck?.warning).length;
 
   document.getElementById('kpiRow').innerHTML =
-    kpiCard('Cloud Run 총 요청 (24h)', fmt(totalRunRequests)) +
-    kpiCard('Functions 총 호출 (24h)', fmt(totalFnExec)) +
-    kpiCard('Functions 총 에러 (24h)', fmt(totalFnErr)) +
+    kpiCard(`Cloud Run 총 요청 (${rangeLabel()})`, fmt(totalRunRequests)) +
+    kpiCard(`Functions 총 호출 (${rangeLabel()})`, fmt(totalFnExec)) +
+    kpiCard(`Functions 총 에러 (${rangeLabel()})`, fmt(totalFnErr)) +
     kpiCard('1st Gen 경고', genWarnings) +
     kpiCard('이번 달 사용 요금', data.billing?.available ? `${data.billing.totalCost} ${data.billing.currency}` : 'N/A');
 
@@ -630,7 +648,7 @@ document.addEventListener('fullscreenchange', updateFullscreenButtonLabel);
 async function refreshDashboard(){
   showLoading();
   try {
-    const data = await fetchDashboardData();
+    const data = await fetchDashboardData(currentRange);
     render(data);
   } catch (err) {
     console.error(err);
@@ -638,6 +656,16 @@ async function refreshDashboard(){
   } finally {
     hideLoading();
   }
+}
+
+// 일별/주별/월별 필터. weekly/monthly는 캐시가 아니라 그 자리에서 라이브 조회라
+// daily보다 응답이 느릴 수 있음 (서버 쪽 주석 참고).
+function setRange(range){
+  if (range === currentRange) return;
+  currentRange = range;
+  document.querySelectorAll('#rangeFilter .btn').forEach(b =>
+    b.classList.toggle('active', b.dataset.range === range));
+  refreshDashboard();
 }
 
 applyThemeButtonLabel();

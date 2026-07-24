@@ -53,23 +53,23 @@ async function queryLogs(filter, maxResults) {
 }
 
 // 리소스 라벨(service_name / function_name)로 좁힌 최근 에러
-async function getRecentErrors(resourceType, resourceName, maxResults = 5) {
+async function getRecentErrors(resourceType, resourceName, maxResults = 5, windowMinutes = 1440) {
   const labelKey = resourceType === 'cloud_run_revision' ? 'service_name' : 'function_name';
   const filter = [
     `resource.type="${resourceType}"`,
     `resource.labels.${labelKey}="${resourceName}"`,
     'severity>=ERROR',
-    'timestamp>="' + new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString() + '"',
+    'timestamp>="' + new Date(Date.now() - windowMinutes * 60 * 1000).toISOString() + '"',
   ].join(' AND ');
 
   return queryLogs(filter, maxResults);
 }
 
 // 메일 발송 실패만 별도로 모아보기 (Gmail SMTP / 앱 비밀번호 만료 등을 빠르게 캐치)
-async function getMailFailures(maxResults = 5) {
+async function getMailFailures(maxResults = 5, windowMinutes = 1440) {
   const filter = [
     'severity>=ERROR',
-    'timestamp>="' + new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString() + '"',
+    'timestamp>="' + new Date(Date.now() - windowMinutes * 60 * 1000).toISOString() + '"',
     '(textPayload=~"mail" OR textPayload=~"SMTP" OR textPayload=~"메일")',
   ].join(' AND ');
 
@@ -110,12 +110,12 @@ async function getHostingTraffic(hostname, windowMinutes = 1440) {
 }
 
 // Hosting은 리소스 라벨 구조가 달라서(firebase_domain + hostname) 별도 함수로 분리
-async function getHostingErrors(hostname, maxResults = 5) {
+async function getHostingErrors(hostname, maxResults = 5, windowMinutes = 1440) {
   const filter = [
     'resource.type="firebase_domain"',
     `jsonPayload.hostname="${hostname}"`,
     'httpRequest.status>=500',
-    'timestamp>="' + new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString() + '"',
+    'timestamp>="' + new Date(Date.now() - windowMinutes * 60 * 1000).toISOString() + '"',
   ].join(' AND ');
 
   return queryLogs(filter, maxResults);

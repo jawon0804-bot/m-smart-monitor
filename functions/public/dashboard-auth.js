@@ -15,12 +15,13 @@ function promptForKey() {
   return key;
 }
 
-async function fetchDashboardData(isRetry) {
+async function fetchDashboardData(range, isRetry) {
   let key = getStoredKey();
   if (!key) key = promptForKey();
   if (!key) throw new Error('API 키가 필요합니다');
 
-  const res = await fetch(API_URL, {
+  const url = range && range !== 'daily' ? `${API_URL}?range=${encodeURIComponent(range)}` : API_URL;
+  const res = await fetch(url, {
     headers: { 'x-api-key': key },
   });
 
@@ -30,7 +31,7 @@ async function fetchDashboardData(isRetry) {
     if (isRetry) throw new Error('API 키가 올바르지 않습니다.');
     const retryKey = promptForKey();
     if (!retryKey) throw new Error('API 키가 필요합니다');
-    return fetchDashboardData(true);
+    return fetchDashboardData(range, true);
   }
 
   if (!res.ok) {
@@ -42,9 +43,9 @@ async function fetchDashboardData(isRetry) {
 }
 
 // 대시보드 HTML에서: loadDashboard((data) => renderDashboard(data));
-async function loadDashboard(callback) {
+async function loadDashboard(callback, range) {
   try {
-    const data = await fetchDashboardData();
+    const data = await fetchDashboardData(range);
     callback(data);
   } catch (err) {
     console.error(err);
